@@ -51,7 +51,6 @@ public:
     bool read(IMUData &data);
 
     void runCalibration(uint8_t buttonPin);
-
     bool loadCalibration();
     bool saveCalibration();
 

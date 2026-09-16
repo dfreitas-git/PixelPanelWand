@@ -14,6 +14,30 @@ Wand IMU code for the PixelPanel controller
     my the PixelPanel to execute control options (change scene, change brightness, change 
     diffuser screen distance, etc.
 
+    Here are the wand coordinate definitions used in the code:
+
+    WAND COORDINATE / SIGN CONVENTION
+
+    Translation:
+      +X = forward / toward wand tip
+      -X = backward / toward handle
+
+      +Y = right
+      -Y = left
+
+      +Z = down
+      -Z = up
+
+    Rotation:
+      +Roll  = clockwise/right
+      -Roll  = counterclockwise/left
+
+      +Pitch = front/tip up
+      -Pitch = front/tip down
+
+      +Yaw   = clockwise viewed from above
+      -Yaw   = counterclockwise viewed from above
+
     The wand has a single momentary-contact button used to switch between modes.  Also, 
     on boot, if the button is held vor ~2.5 seconds we will enter a calibration routine 
     where the wand is oriented around all six directions (+/-X, +/-Y, +/-Z) and lying still

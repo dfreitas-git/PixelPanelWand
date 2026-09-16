@@ -12,6 +12,30 @@
     my the PixelPanel to execute control options (change scene, change brightness, change 
     diffuser screen distance, etc.
 
+    Here are the wand coordinate definitions used in the code:
+
+    WAND COORDINATE / SIGN CONVENTION
+
+    Translation:
+      +X = forward / toward wand tip
+      -X = backward / toward handle
+
+      +Y = right
+      -Y = left
+
+      +Z = down
+      -Z = up
+
+    Rotation:
+      +Roll  = clockwise/right
+      -Roll  = counterclockwise/left
+
+      +Pitch = front/tip up
+      -Pitch = front/tip down
+
+      +Yaw   = clockwise viewed from above
+      -Yaw   = counterclockwise viewed from above
+
     The wand has a single momentary-contact button used to switch between modes.  Also, 
     on boot, if the button is held vor ~2.5 seconds we will enter a calibration routine 
     where the wand is oriented around all six directions (+/-X, +/-Y, +/-Z) and lying still
@@ -25,12 +49,15 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include "Globals.h"
 #include "WandIMU.h"
 #include "PoseEstimator.h"
+#include "MotionEstimator.h"
 
 // Class Instances 
 WandIMU wandIMU(Wire, 0x68);
 PoseEstimator poseEstimator;
+MotionEstimator motionEstimator;
 
 // Prototypes
 bool calibrationRequestedAtBoot();
@@ -39,6 +66,8 @@ constexpr uint8_t BUTTON_PIN = 25;
 constexpr uint32_t CALIBRATION_HOLD_MS = 2500;
 uint32_t lastUpdateUs = 0;
 uint32_t lastPrintMs = 0;
+uint16_t numberOfPrints = 0;
+bool poseUpdated = false;
 
 void setup()
 {
@@ -75,13 +104,20 @@ void loop()
         if (lastUpdateUs != 0) {
             float dt = (nowUs - lastUpdateUs) * 1.0e-6f;
             poseEstimator.update(imu, dt);
+            const WandPose &pose = poseEstimator.getPose();
+
+            motionEstimator.update(imu,pose,dt);
+            poseUpdated = true;
         }
         lastUpdateUs = nowUs;
 
-        if (millis() - lastPrintMs >= 100) {
+        /*
+        if (numberOfPrints < 25 && poseUpdated && millis() - lastPrintMs >= 100) {
             lastPrintMs = millis();
 
+            numberOfPrints++;
             const WandPose &pose = poseEstimator.getPose();
+            const WandMotion &motion = motionEstimator.getMotion();
 
             Serial.print("Roll: ");
             Serial.print(pose.roll * 180.0f / PI, 3);
@@ -91,7 +127,46 @@ void loop()
 
             Serial.print("  Yaw: ");
             Serial.println(pose.yaw * 180.0f / PI, 3);
+
+            Serial.print("MotionY: ");
+            Serial.print(motion.ay, 3);
+
+            Serial.print("  MotionX: ");
+            Serial.print(motion.ax, 3);
+
+            Serial.print("  MotionZ: ");
+            Serial.println(motion.az, 3);
+
+           // Serial.print("accelMag: ");
+           // Serial.print(accelMag,3);
+           // Serial.print("  accelTrust: ");
+           // Serial.println(accelTrust,3);
+
+            Serial.print("VelocityY: ");
+            Serial.print(motion.vy, 3);
+
+            Serial.print("  VelocityX: ");
+            Serial.print(motion.vx, 3);
+
+            Serial.print("  VelocityZ: ");
+            Serial.println(motion.vz, 3);
+            
+            Serial.print("accelPitch: ");
+            Serial.println(accelPitch);
+            Serial.print("predictedPitch: ");
+            Serial.println(predictedPitch);
+            Serial.print("rollDiffTrust: ");
+            Serial.println(rollDiffTrust);
+            Serial.print("pitchDiffTrust: ");
+            Serial.println(pitchDiffTrust);
+            Serial.print("accelRollTrust: ");
+            Serial.println(accelRollTrust);
+            Serial.print("accelPitchTrust: ");
+            Serial.println(accelPitchTrust);
+            
+            Serial.println();
         }
+        */
     }
     delay(10);
 }

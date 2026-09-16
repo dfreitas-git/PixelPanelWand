@@ -3,7 +3,11 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
+#include "Globals.h"
 #include "MPU9250.h"
+
+// moved to Globals.h
+//static constexpr float G = 9.80665f;
 
 struct AccelCalibration {
     float biasX  = 0.0f;
@@ -44,12 +48,11 @@ struct IMUData {
 
 class WandIMU {
 public:
+
     WandIMU(TwoWire &wire, uint8_t address);
 
     bool begin();
-
     bool read(IMUData &data);
-
     void runCalibration(uint8_t buttonPin);
     bool loadCalibration();
     bool saveCalibration();
@@ -61,8 +64,6 @@ private:
 
     AccelCalibration accelCal;
     GyroCalibration gyroCal;
-
-    static constexpr float G = 9.80665f;
 
     static constexpr uint16_t CAL_ACCEL_SAMPLES = 200;
     static constexpr uint16_t CAL_GYRO_SAMPLES = 750;

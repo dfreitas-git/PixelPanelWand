@@ -31,5 +31,6 @@ private:
     float gainY = 1.0f;
     float gainZ = 1.0f;
     float damping = 0.9f;
+
     WandMotion motion{};
 };

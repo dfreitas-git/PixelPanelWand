@@ -53,17 +53,27 @@
 #include "WandIMU.h"
 #include "PoseEstimator.h"
 #include "MotionEstimator.h"
+#include "WandRadio.h"
 
 // Class Instances 
 WandIMU wandIMU(Wire, 0x68);
 PoseEstimator poseEstimator;
 MotionEstimator motionEstimator;
+WandRadio wandRadio;
 
 // Prototypes
 bool calibrationRequestedAtBoot();
 
 constexpr uint8_t BUTTON_PIN = 25;
 constexpr uint32_t CALIBRATION_HOLD_MS = 2500;
+constexpr uint8_t PANEL_MAC[6] = { 0x2C, 0xBC, 0xBB, 0x4B, 0x7C, 0x60 };
+//constexpr uint32_t RADIO_INTERVAL_US = 20000;   // 50 Hz
+constexpr uint32_t RADIO_INTERVAL_US = 2000000;   // .5 Hz for debugging
+
+// For ESP-NOW
+uint32_t lastRadioUs = 0;
+uint32_t packetSequence = 0;
+
 uint32_t lastUpdateUs = 0;
 uint32_t lastPrintMs = 0;
 uint16_t numberOfPrints = 0;
@@ -78,6 +88,15 @@ void setup()
 
     Serial.println();
     Serial.println("PixelPanel Wand");
+
+    // Set up ESP-NOW
+    if (!wandRadio.begin(PANEL_MAC)) {
+        Serial.println("Fatal ESP-NOW initialization error.");
+
+        while (true) {
+            delay(1000);
+        }
+    }
 
     bool doCalibration = calibrationRequestedAtBoot();
 
@@ -99,8 +118,8 @@ void loop()
     IMUData imu;
 
     if (wandIMU.read(imu)) {
-        uint32_t nowUs = micros();
 
+        uint32_t nowUs = micros();
         if (lastUpdateUs != 0) {
             float dt = (nowUs - lastUpdateUs) * 1.0e-6f;
             poseEstimator.update(imu, dt);
@@ -111,8 +130,45 @@ void loop()
         }
         lastUpdateUs = nowUs;
 
-        /*
-        if (numberOfPrints < 25 && poseUpdated && millis() - lastPrintMs >= 100) {
+        // Send ESP-NOW packet at its own time interval
+        if (nowUs - lastRadioUs >= RADIO_INTERVAL_US) {
+        
+            lastRadioUs += RADIO_INTERVAL_US;
+        
+            const WandPose &pose = poseEstimator.getPose();
+            const WandMotion &motion = motionEstimator.getMotion();
+        
+            WandPacket wandPacket{};
+        
+            wandPacket.magic       = WAND_PROTOCOL_MAGIC;
+            wandPacket.version     = WAND_PROTOCOL_VERSION;
+        
+            wandPacket.sequence    = packetSequence++;
+            wandPacket.timestampMs = millis();
+        
+            wandPacket.mode        = WandMode::Scene;
+            wandPacket.gesture     = WandGesture::None;
+        
+            wandPacket.roll  = pose.roll;
+            wandPacket.pitch = pose.pitch;
+            wandPacket.yaw   = pose.yaw;
+        
+            wandPacket.gx = imu.gx;
+            wandPacket.gy = imu.gy;
+            wandPacket.gz = imu.gz;
+        
+            wandPacket.vx = motion.vx;
+            wandPacket.vy = motion.vy;
+            wandPacket.vz = motion.vz;
+        
+            if (!wandRadio.send(wandPacket)) {
+                Serial.println("ESP-NOW send failed.");
+            }
+        }
+
+        
+        //if (numberOfPrints < 25 && poseUpdated && millis() - lastPrintMs >= 100) {
+        if (poseUpdated && millis() - lastPrintMs >= 100) {
             lastPrintMs = millis();
 
             numberOfPrints++;
@@ -166,9 +222,10 @@ void loop()
             
             Serial.println();
         }
-        */
+        
     }
-    delay(10);
+    //delay(10);
+    delay(500);  // for debug
 }
 
 bool calibrationRequestedAtBoot()

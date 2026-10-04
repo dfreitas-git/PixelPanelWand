@@ -475,11 +475,6 @@ bool WandIMU::saveCalibration()
     if (!accelCal.valid) {
         return false;
     }
-    /*
-    if (!gyroCal.valid) {
-        return false;
-    }
-    */
 
     if (!preferences.begin("wandimu", false)) {
         return false;
@@ -496,10 +491,6 @@ bool WandIMU::saveCalibration()
     ok &= (preferences.putFloat("axs", accelCal.scaleX) != 0);
     ok &= (preferences.putFloat("ays", accelCal.scaleY) != 0);
     ok &= (preferences.putFloat("azs", accelCal.scaleZ) != 0);
-
-    //ok &= (preferences.putFloat("gxb", gyroCal.biasX) != 0);
-    //ok &= (preferences.putFloat("gyb", gyroCal.biasY) != 0);
-    //ok &= (preferences.putFloat("gzb", gyroCal.biasZ) != 0);
 
     preferences.end();
 
@@ -521,15 +512,10 @@ bool WandIMU::loadCalibration()
     }
 
     AccelCalibration loadedAccl;
-    //GyroCalibration loadedGyro;
 
     loadedAccl.biasX = preferences.getFloat("axb", NAN);
     loadedAccl.biasY = preferences.getFloat("ayb", NAN);
     loadedAccl.biasZ = preferences.getFloat("azb", NAN);
-
-    //loadedGyro.biasX = preferences.getFloat("gxb", NAN);
-    //loadedGyro.biasY = preferences.getFloat("gyb", NAN);
-    //loadedGyro.biasZ = preferences.getFloat("gzb", NAN);
 
     loadedAccl.scaleX = preferences.getFloat("axs", NAN);
     loadedAccl.scaleY = preferences.getFloat("ays", NAN);
@@ -540,9 +526,6 @@ bool WandIMU::loadCalibration()
     if (!isfinite(loadedAccl.biasX) ||
         !isfinite(loadedAccl.biasY) ||
         !isfinite(loadedAccl.biasZ) ||
-        //!isfinite(loadedGyro.biasX) ||
-        //!isfinite(loadedGyro.biasY) ||
-        //!isfinite(loadedGyro.biasZ) ||
         !isfinite(loadedAccl.scaleX) ||
         !isfinite(loadedAccl.scaleY) ||
         !isfinite(loadedAccl.scaleZ)) {
@@ -551,18 +534,12 @@ bool WandIMU::loadCalibration()
     }
 
     loadedAccl.valid = true;
-    //loadedGyro.valid = true;
 
     AccelCalibration oldCal = accelCal;
     accelCal = loadedAccl;
 
-    //GyroCalibration oldGyroCal = gyroCal;
-    //gyroCal = loadedGyro;
-
-    //if (!validateAccelCalibration() || !validateGyroCalibration()) {
     if (!validateAccelCalibration()) {
         accelCal = oldCal;
-        //gyroCal = oldGyroCal;
         return false;
     }
 

@@ -29,6 +29,12 @@ struct GyroCalibration {
     bool valid = false;
 };
 
+struct SessionGyroCalibration {
+    float biasX  = 0.0f;
+    float biasY  = 0.0f;
+    float biasZ  = 0.0f;
+};
+
 struct IMUData {
     float ax;
     float ay;
@@ -54,8 +60,13 @@ public:
     bool begin();
     bool read(IMUData &data);
     void runCalibration(uint8_t buttonPin);
+    void runSessionGyroCalibration();
     bool loadCalibration();
     bool saveCalibration();
+
+    bool sessionGyroCalDone = false;
+    bool sessionGyroCalFirstCycle = true;
+    uint32_t sessionGyroCalStart = 0;
 
 
 private:
@@ -64,11 +75,14 @@ private:
 
     AccelCalibration accelCal;
     GyroCalibration gyroCal;
+    SessionGyroCalibration sessionGyroCal;
+
 
     static constexpr uint16_t CAL_ACCEL_SAMPLES = 200;
     static constexpr uint16_t CAL_GYRO_SAMPLES = 750;
     static constexpr uint16_t CAL_SAMPLE_DELAY_MS = 10;
     static constexpr uint32_t CAL_VERSION = 2;
+    static constexpr uint32_t SESSION_GYRO_CAL_TIME_mS = 2000;   
 
     void waitForButtonPress(uint8_t buttonPin);
     void waitForButtonRelease(uint8_t buttonPin);
@@ -87,6 +101,10 @@ private:
 
     bool validateAccelCalibration() const;
     bool validateGyroCalibration() const;
-
     void printCalibration() const;
+
+    float calGyroX;
+    float calGyroY;
+    float calGyroZ;
+    int sessionGyroCalCycles = 0;
 };

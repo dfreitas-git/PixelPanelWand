@@ -40,14 +40,6 @@ bool WandIMU::read(IMUData &data)
     float rawAx = imu.getAccelX_mss();
     float rawAy = imu.getAccelY_mss();
     float rawAz = imu.getAccelZ_mss();
-    /*
-    Serial.print("=>");
-    Serial.print(rawAx,3);
-    Serial.print("\t");
-    Serial.print(rawAy,3);
-    Serial.print("\t");
-    Serial.println(rawAz,3);
-    */
 
     // Apply accererometer calibration
     data.ax = (rawAx - accelCal.biasX) * accelCal.scaleX;
@@ -55,9 +47,9 @@ bool WandIMU::read(IMUData &data)
     data.az = (rawAz - accelCal.biasZ) * accelCal.scaleZ;
 
     // Apply gyro zero-rate bias correction.
-    data.gx = imu.getGyroX_rads() - gyroCal.biasX;
-    data.gy = imu.getGyroY_rads() - gyroCal.biasY;
-    data.gz = imu.getGyroZ_rads() - gyroCal.biasZ;
+    data.gx = imu.getGyroX_rads() - gyroCal.biasX - sessionGyroCal.biasX;
+    data.gy = imu.getGyroY_rads() - gyroCal.biasY - sessionGyroCal.biasY;
+    data.gz = imu.getGyroZ_rads() - gyroCal.biasZ - sessionGyroCal.biasZ;
 
     // Magnetometer are currently uncalibrated.
     data.mx = imu.getMagX_uT();
@@ -309,6 +301,37 @@ void WandIMU::runCalibration(uint8_t buttonPin)
     }
 
     Serial.println("Calibration complete.");
+}
+
+// Always run a gyro bias check during power up
+void WandIMU::runSessionGyroCalibration()
+{
+    imu.readSensor();
+
+    if(sessionGyroCalFirstCycle) {
+        Serial.println("Gyro Calibration In Progress.  Do Not Move Wand");
+        sessionGyroCalFirstCycle = false;
+    } 
+
+    // Accumulate readings to average after the cal time
+    calGyroX += imu.getGyroX_rads();
+    calGyroY += imu.getGyroY_rads();
+    calGyroZ += imu.getGyroZ_rads();
+    sessionGyroCalCycles++;
+
+    // set the bias to the per-cycle difference of the first reading and the final reading
+    if(millis() - sessionGyroCalStart > SESSION_GYRO_CAL_TIME_mS) {
+        sessionGyroCal.biasX = calGyroX / sessionGyroCalCycles;
+        sessionGyroCal.biasY = calGyroY / sessionGyroCalCycles;
+        sessionGyroCal.biasZ = calGyroZ / sessionGyroCalCycles;
+
+        Serial.print("sessionGyroCal.biasX: "); Serial.println(sessionGyroCal.biasX,9);
+        Serial.print("sessionGyroCal.biasY: "); Serial.println(sessionGyroCal.biasY,9);
+        Serial.print("sessionGyroCal.biasZ: "); Serial.println(sessionGyroCal.biasZ,9);
+
+        sessionGyroCalDone = true;
+        Serial.println("Session Gyro Calibration Complete.");
+    }
 }
 
 

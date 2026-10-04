@@ -67,8 +67,7 @@ bool calibrationRequestedAtBoot();
 constexpr uint8_t BUTTON_PIN = 25;
 constexpr uint32_t CALIBRATION_HOLD_MS = 2500;
 constexpr uint8_t PANEL_MAC[6] = { 0x2C, 0xBC, 0xBB, 0x4B, 0x7C, 0x60 };
-//constexpr uint32_t RADIO_INTERVAL_US = 20000;   // 50 Hz
-constexpr uint32_t RADIO_INTERVAL_US = 2000000;   // .5 Hz for debugging
+constexpr uint32_t RADIO_INTERVAL_US = 20000;   // 50 Hz
 
 // For ESP-NOW
 uint32_t lastRadioUs = 0;
@@ -76,7 +75,6 @@ uint32_t packetSequence = 0;
 
 uint32_t lastUpdateUs = 0;
 uint32_t lastPrintMs = 0;
-uint16_t numberOfPrints = 0;
 bool poseUpdated = false;
 
 void setup()
@@ -110,6 +108,7 @@ void setup()
     if (doCalibration) {
         wandIMU.runCalibration(BUTTON_PIN);
     }
+    wandIMU.sessionGyroCalStart = millis();
 }
 
 
@@ -118,17 +117,19 @@ void loop()
     IMUData imu;
 
     if (wandIMU.read(imu)) {
-
         uint32_t nowUs = micros();
         if (lastUpdateUs != 0) {
             float dt = (nowUs - lastUpdateUs) * 1.0e-6f;
             poseEstimator.update(imu, dt);
             const WandPose &pose = poseEstimator.getPose();
-
             motionEstimator.update(imu,pose,dt);
             poseUpdated = true;
+            if(!wandIMU.sessionGyroCalDone) {
+                wandIMU.runSessionGyroCalibration();
+            }
         }
         lastUpdateUs = nowUs;
+
 
         // Send ESP-NOW packet at its own time interval
         if (nowUs - lastRadioUs >= RADIO_INTERVAL_US) {
@@ -162,16 +163,14 @@ void loop()
             wandPacket.vz = motion.vz;
         
             if (!wandRadio.send(wandPacket)) {
-                Serial.println("ESP-NOW send failed.");
+                //dlf Serial.println("ESP-NOW send failed.");
             }
         }
 
         
-        //if (numberOfPrints < 25 && poseUpdated && millis() - lastPrintMs >= 100) {
-        if (poseUpdated && millis() - lastPrintMs >= 100) {
+        if (poseUpdated && millis() - lastPrintMs >= 1000) {
             lastPrintMs = millis();
 
-            numberOfPrints++;
             const WandPose &pose = poseEstimator.getPose();
             const WandMotion &motion = motionEstimator.getMotion();
 
@@ -222,10 +221,8 @@ void loop()
             
             Serial.println();
         }
-        
     }
-    //delay(10);
-    delay(500);  // for debug
+    delay(10);
 }
 
 bool calibrationRequestedAtBoot()

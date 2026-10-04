@@ -76,6 +76,6 @@ void WandRadio::onDataSent( const uint8_t *macAddr, esp_now_send_status_t status
     // At 50 Hz that would make Serial output rather unpleasant.
 
     if (status != ESP_NOW_SEND_SUCCESS) {
-        Serial.println("ESP-NOW delivery failed.");
+       //dlf Serial.println("ESP-NOW delivery failed.");
     }
 }

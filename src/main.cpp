@@ -96,7 +96,7 @@ void setup()
         }
     }
 
-    bool doCalibration = calibrationRequestedAtBoot();
+    bool doAccelCalibration = calibrationRequestedAtBoot();
 
     if (!wandIMU.begin()) {
         Serial.println("Fatal IMU error.");
@@ -105,16 +105,25 @@ void setup()
         }
     }
 
-    if (doCalibration) {
-        wandIMU.runCalibration(BUTTON_PIN);
+    if (doAccelCalibration) {
+        wandIMU.runAccelCalibration(BUTTON_PIN);
     }
-    wandIMU.sessionGyroCalStart = millis();
+
+    // Always run the gyro calibration on boot-up
+    wandIMU.gyroCalStart = millis();
 }
 
 
 void loop()
 {
     IMUData imu;
+
+    // First calibrate the gyro before doing the regular loop operations
+    if (!wandIMU.gyroCalDone) {
+        wandIMU.runGyroCalibration();
+        delay(10);
+        return;
+    }
 
     if (wandIMU.read(imu)) {
         uint32_t nowUs = micros();
@@ -124,9 +133,6 @@ void loop()
             const WandPose &pose = poseEstimator.getPose();
             motionEstimator.update(imu,pose,dt);
             poseUpdated = true;
-            if(!wandIMU.sessionGyroCalDone) {
-                wandIMU.runSessionGyroCalibration();
-            }
         }
         lastUpdateUs = nowUs;
 

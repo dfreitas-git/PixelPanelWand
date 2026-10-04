@@ -13,17 +13,17 @@ bool WandIMU::begin()
     int status = imu.begin();
 
     if (status < 0) {
-        Serial.print("MPU9250 initialization failed. Status = ");
+        Serial.print(F("MPU9250 initialization failed. Status = "));
         Serial.println(status);
         return false;
     }
 
     if (loadCalibration()) {
-        Serial.println("IMU calibration loaded.");
+        Serial.println(F("IMU calibration loaded."));
         printCalibration();
     }
     else {
-        Serial.println("No valid IMU calibration found.");
+        Serial.println(F("No valid IMU calibration found."));
     }
 
     return true;
@@ -47,9 +47,9 @@ bool WandIMU::read(IMUData &data)
     data.az = (rawAz - accelCal.biasZ) * accelCal.scaleZ;
 
     // Apply gyro zero-rate bias correction.
-    data.gx = imu.getGyroX_rads() - gyroCal.biasX - sessionGyroCal.biasX;
-    data.gy = imu.getGyroY_rads() - gyroCal.biasY - sessionGyroCal.biasY;
-    data.gz = imu.getGyroZ_rads() - gyroCal.biasZ - sessionGyroCal.biasZ;
+    data.gx = imu.getGyroX_rads() - gyroCal.biasX;
+    data.gy = imu.getGyroY_rads() - gyroCal.biasY;
+    data.gz = imu.getGyroZ_rads() - gyroCal.biasZ;
 
     // Magnetometer are currently uncalibrated.
     data.mx = imu.getMagX_uT();
@@ -137,7 +137,7 @@ void WandIMU::waitForButtonPress(uint8_t buttonPin)
 }
 
 
-void WandIMU::runCalibration(uint8_t buttonPin)
+void WandIMU::runAccelCalibration(uint8_t buttonPin)
 {
     float xPos, xNeg;
     float yPos, yNeg;
@@ -148,15 +148,15 @@ void WandIMU::runCalibration(uint8_t buttonPin)
 
     // Save copies or original to restore in case calibration fails
     AccelCalibration oldAccelCal = accelCal;
-    GyroCalibration oldGyroCal = gyroCal;
+    //GyroCalibration oldGyroCal = gyroCal;
 
     Serial.println();
-    Serial.println("================================");
-    Serial.println("ACCELEROMETER CALIBRATION");
-    Serial.println("================================");
+    Serial.println(F("================================"));
+    Serial.println(F("ACCELEROMETER CALIBRATION"));
+    Serial.println(F("================================"));
     Serial.println();
-    Serial.println("Keep the wand motionless for each measurement.");
-    Serial.println("Press the button after placing it in the requested orientation.");
+    Serial.println(F("Keep the wand motionless for each measurement."));
+    Serial.println(F("Press the button after placing it in the requested orientation."));
     Serial.println();
 
     // Ensure the boot/calibration-entry button press has been released.
@@ -179,8 +179,8 @@ void WandIMU::runCalibration(uint8_t buttonPin)
 
 
     Serial.println();
-    Serial.println("2/6: Place TOP EDGE of wand DOWN.");
-    Serial.println("Press button when motionless.");
+    Serial.println(F("2/6: Place TOP EDGE of wand DOWN."));
+    Serial.println(F("Press button when motionless."));
     waitForButtonPress(buttonPin);
 
     captureAccelAverage(xNeg, dummy1, dummy2);
@@ -195,19 +195,19 @@ void WandIMU::runCalibration(uint8_t buttonPin)
     // ------------------------------------------------------------
 
     Serial.println();
-    Serial.println("3/6: Place LEFT EDGE of wand DOWN.");
-    Serial.println("Press button when motionless.");
+    Serial.println(F("3/6: Place LEFT EDGE of wand DOWN."));
+    Serial.println(F("Press button when motionless."));
     waitForButtonPress(buttonPin);
 
     captureAccelAverage(dummy1, yPos, dummy2);
 
-    Serial.print("Y+ = ");
+    Serial.print(F("Y+ = "));
     Serial.println(yPos, 6);
 
 
     Serial.println();
-    Serial.println("4/6: Place RIGHT EDGE of wand DOWN.");
-    Serial.println("Press button when motionless.");
+    Serial.println(F("4/6: Place RIGHT EDGE of wand DOWN."));
+    Serial.println(F("Press button when motionless."));
     waitForButtonPress(buttonPin);
 
     captureAccelAverage(dummy1, yNeg, dummy2);
@@ -225,8 +225,8 @@ void WandIMU::runCalibration(uint8_t buttonPin)
     // ------------------------------------------------------------
 
     Serial.println();
-    Serial.println("5/6: Place FACE of wand DOWN.");
-    Serial.println("Press button when motionless.");
+    Serial.println(F("5/6: Place FACE of wand DOWN."));
+    Serial.println(F("Press button when motionless."));
     waitForButtonPress(buttonPin);
 
     captureAccelAverage(dummy1, dummy2, zPos);
@@ -236,8 +236,8 @@ void WandIMU::runCalibration(uint8_t buttonPin)
 
 
     Serial.println();
-    Serial.println("6/6: Place FACE of wand UP.");
-    Serial.println("Press button when motionless.");
+    Serial.println(F("6/6: Place FACE of wand UP."));
+    Serial.println(F("Press button when motionless."));
     waitForButtonPress(buttonPin);
 
     captureAccelAverage(dummy1, dummy2, zNeg);
@@ -247,6 +247,7 @@ void WandIMU::runCalibration(uint8_t buttonPin)
 
     Serial.println();
 
+    /*
     Serial.println("GYROSCOPE CALIBRATION");
     Serial.println("Place wand motionless on a stable surface.");
     Serial.println("Press button when ready.");
@@ -263,10 +264,10 @@ void WandIMU::runCalibration(uint8_t buttonPin)
     Serial.print(gyY, 6);
     Serial.print("  gyZ = ");
     Serial.println(gyZ, 6);
+    */
 
     Serial.println();
-    Serial.println("Computing calibration...");
-
+    Serial.println(F("Computing calibration..."));
 
     if (!computeAccelCalibration(
             xPos, xNeg,
@@ -274,13 +275,14 @@ void WandIMU::runCalibration(uint8_t buttonPin)
             zPos, zNeg)) {
 
         accelCal = oldAccelCal;
-        gyroCal = oldGyroCal;
+        //gyroCal = oldGyroCal;
 
-        Serial.println("ACCELEROMETER CALIBRATION FAILED.");
-        Serial.println("Old calibration restored.");
+        Serial.println(F("ACCELEROMETER CALIBRATION FAILED."));
+        Serial.println(F("Old calibration restored."));
         return;
     }
 
+    /*
     if (!computeGyroCalibration(gyX, gyY, gyZ)) {
 
         accelCal = oldAccelCal;
@@ -291,46 +293,65 @@ void WandIMU::runCalibration(uint8_t buttonPin)
         return;
     }
 
+    */
     printCalibration();
 
     if (saveCalibration()) {
-        Serial.println("Calibration saved to NVS.");
+        Serial.println(F("Calibration saved to NVS."));
     }
     else {
-        Serial.println("ERROR: calibration could not be saved.");
+        Serial.println(F("ERROR: calibration could not be saved."));
     }
 
-    Serial.println("Calibration complete.");
+    Serial.println(F("Calibration complete."));
 }
 
 // Always run a gyro bias check during power up
-void WandIMU::runSessionGyroCalibration()
+void WandIMU::runGyroCalibration()
 {
+    float curGyroX, curGyroY, curGyroZ = 0.0f;
     imu.readSensor();
 
-    if(sessionGyroCalFirstCycle) {
-        Serial.println("Gyro Calibration In Progress.  Do Not Move Wand");
-        sessionGyroCalFirstCycle = false;
+    if(gyroCalFirstCycle) {
+        Serial.println(F("Gyro Calibration In Progress.  Do Not Move Wand"));
+        gyroCalFirstCycle = false;
     } 
+    curGyroX = imu.getGyroX_rads();
+    curGyroY = imu.getGyroY_rads();
+    curGyroZ = imu.getGyroZ_rads();
 
-    // Accumulate readings to average after the cal time
-    calGyroX += imu.getGyroX_rads();
-    calGyroY += imu.getGyroY_rads();
-    calGyroZ += imu.getGyroZ_rads();
-    sessionGyroCalCycles++;
+    // If the last and current readings differ by more thatn 10%, assume the wand moved and restart cal
+    if(fabs(curGyroX) > MAX_CAL_GYRO_RATE ||
+       fabs(curGyroY) > MAX_CAL_GYRO_RATE ||
+       fabs(curGyroZ) > MAX_CAL_GYRO_RATE) {
+        Serial.println(F("Error: Wand moving during calibration.  Hold wand still!  Restarting cal."));
+        gyroCalFirstCycle = true;
+        calGyroX = 0.0f;
+        calGyroY = 0.0f;
+        calGyroZ = 0.0f;
+        gyroCalStart = millis();
+        gyroCalCycles = 0;;
+    } else {
+
+        // Accumulate readings to average after the cal time
+        calGyroX += curGyroX;
+        calGyroY += curGyroY;
+        calGyroZ += curGyroZ;
+        gyroCalCycles++;
+    }
 
     // set the bias to the per-cycle difference of the first reading and the final reading
-    if(millis() - sessionGyroCalStart > SESSION_GYRO_CAL_TIME_mS) {
-        sessionGyroCal.biasX = calGyroX / sessionGyroCalCycles;
-        sessionGyroCal.biasY = calGyroY / sessionGyroCalCycles;
-        sessionGyroCal.biasZ = calGyroZ / sessionGyroCalCycles;
+    if(millis() - gyroCalStart > SESSION_GYRO_CAL_TIME_mS) {
+        gyroCal.biasX = calGyroX / gyroCalCycles;
+        gyroCal.biasY = calGyroY / gyroCalCycles;
+        gyroCal.biasZ = calGyroZ / gyroCalCycles;
 
-        Serial.print("sessionGyroCal.biasX: "); Serial.println(sessionGyroCal.biasX,9);
-        Serial.print("sessionGyroCal.biasY: "); Serial.println(sessionGyroCal.biasY,9);
-        Serial.print("sessionGyroCal.biasZ: "); Serial.println(sessionGyroCal.biasZ,9);
+        Serial.print(F("gyroCal.biasX: ")); Serial.println(gyroCal.biasX,9);
+        Serial.print(F("gyroCal.biasY: ")); Serial.println(gyroCal.biasY,9);
+        Serial.print(F("gyroCal.biasZ: ")); Serial.println(gyroCal.biasZ,9);
 
-        sessionGyroCalDone = true;
-        Serial.println("Session Gyro Calibration Complete.");
+        gyroCalDone = true;
+        Serial.println(F("Gyro Calibration Complete."));
     }
 }
 
@@ -454,9 +475,11 @@ bool WandIMU::saveCalibration()
     if (!accelCal.valid) {
         return false;
     }
+    /*
     if (!gyroCal.valid) {
         return false;
     }
+    */
 
     if (!preferences.begin("wandimu", false)) {
         return false;
@@ -474,9 +497,9 @@ bool WandIMU::saveCalibration()
     ok &= (preferences.putFloat("ays", accelCal.scaleY) != 0);
     ok &= (preferences.putFloat("azs", accelCal.scaleZ) != 0);
 
-    ok &= (preferences.putFloat("gxb", gyroCal.biasX) != 0);
-    ok &= (preferences.putFloat("gyb", gyroCal.biasY) != 0);
-    ok &= (preferences.putFloat("gzb", gyroCal.biasZ) != 0);
+    //ok &= (preferences.putFloat("gxb", gyroCal.biasX) != 0);
+    //ok &= (preferences.putFloat("gyb", gyroCal.biasY) != 0);
+    //ok &= (preferences.putFloat("gzb", gyroCal.biasZ) != 0);
 
     preferences.end();
 
@@ -498,15 +521,15 @@ bool WandIMU::loadCalibration()
     }
 
     AccelCalibration loadedAccl;
-    GyroCalibration loadedGyro;
+    //GyroCalibration loadedGyro;
 
     loadedAccl.biasX = preferences.getFloat("axb", NAN);
     loadedAccl.biasY = preferences.getFloat("ayb", NAN);
     loadedAccl.biasZ = preferences.getFloat("azb", NAN);
 
-    loadedGyro.biasX = preferences.getFloat("gxb", NAN);
-    loadedGyro.biasY = preferences.getFloat("gyb", NAN);
-    loadedGyro.biasZ = preferences.getFloat("gzb", NAN);
+    //loadedGyro.biasX = preferences.getFloat("gxb", NAN);
+    //loadedGyro.biasY = preferences.getFloat("gyb", NAN);
+    //loadedGyro.biasZ = preferences.getFloat("gzb", NAN);
 
     loadedAccl.scaleX = preferences.getFloat("axs", NAN);
     loadedAccl.scaleY = preferences.getFloat("ays", NAN);
@@ -517,9 +540,9 @@ bool WandIMU::loadCalibration()
     if (!isfinite(loadedAccl.biasX) ||
         !isfinite(loadedAccl.biasY) ||
         !isfinite(loadedAccl.biasZ) ||
-        !isfinite(loadedGyro.biasX) ||
-        !isfinite(loadedGyro.biasY) ||
-        !isfinite(loadedGyro.biasZ) ||
+        //!isfinite(loadedGyro.biasX) ||
+        //!isfinite(loadedGyro.biasY) ||
+        //!isfinite(loadedGyro.biasZ) ||
         !isfinite(loadedAccl.scaleX) ||
         !isfinite(loadedAccl.scaleY) ||
         !isfinite(loadedAccl.scaleZ)) {
@@ -528,17 +551,18 @@ bool WandIMU::loadCalibration()
     }
 
     loadedAccl.valid = true;
-    loadedGyro.valid = true;
+    //loadedGyro.valid = true;
 
     AccelCalibration oldCal = accelCal;
     accelCal = loadedAccl;
 
-    GyroCalibration oldGyroCal = gyroCal;
-    gyroCal = loadedGyro;
+    //GyroCalibration oldGyroCal = gyroCal;
+    //gyroCal = loadedGyro;
 
-    if (!validateAccelCalibration() || !validateGyroCalibration()) {
+    //if (!validateAccelCalibration() || !validateGyroCalibration()) {
+    if (!validateAccelCalibration()) {
         accelCal = oldCal;
-        gyroCal = oldGyroCal;
+        //gyroCal = oldGyroCal;
         return false;
     }
 
@@ -549,16 +573,16 @@ bool WandIMU::loadCalibration()
 void WandIMU::printCalibration() const
 {
     Serial.println();
-    Serial.println("Accelerometer calibration:");
+    Serial.println(F("Accelerometer calibration:"));
 
-    Serial.print("Bias:  ");
+    Serial.print(F("Bias:  "));
     Serial.print(accelCal.biasX, 6);
     Serial.print("\t");
     Serial.print(accelCal.biasY, 6);
     Serial.print("\t");
     Serial.println(accelCal.biasZ, 6);
 
-    Serial.print("Scale: ");
+    Serial.print(F("Scale: "));
     Serial.print(accelCal.scaleX, 6);
     Serial.print("\t");
     Serial.print(accelCal.scaleY, 6);
@@ -566,8 +590,8 @@ void WandIMU::printCalibration() const
     Serial.println(accelCal.scaleZ, 6);
     Serial.println();
 
-    Serial.println("Gyroscope calibration:");
-    Serial.print("Bias:  ");
+    Serial.println(F("Gyroscope calibration:"));
+    Serial.print(F("Bias:  "));
     Serial.print(gyroCal.biasX, 6);
     Serial.print("\t");
     Serial.print(gyroCal.biasY, 6);

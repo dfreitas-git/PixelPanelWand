@@ -59,14 +59,14 @@ public:
 
     bool begin();
     bool read(IMUData &data);
-    void runCalibration(uint8_t buttonPin);
-    void runSessionGyroCalibration();
+    void runAccelCalibration(uint8_t buttonPin);
+    void runGyroCalibration();
     bool loadCalibration();
     bool saveCalibration();
 
-    bool sessionGyroCalDone = false;
-    bool sessionGyroCalFirstCycle = true;
-    uint32_t sessionGyroCalStart = 0;
+    bool gyroCalDone = false;
+    bool gyroCalFirstCycle = true;
+    uint32_t gyroCalStart = 0;
 
 
 private:
@@ -103,8 +103,9 @@ private:
     bool validateGyroCalibration() const;
     void printCalibration() const;
 
-    float calGyroX;
-    float calGyroY;
-    float calGyroZ;
-    int sessionGyroCalCycles = 0;
+    float calGyroX = 0.0f;
+    float calGyroY = 0.0f;
+    float calGyroZ = 0.0f;
+    int gyroCalCycles = 0;
+    float MAX_CAL_GYRO_RATE = 0.05f;  // rad/sec
 };

@@ -54,26 +54,26 @@
 #include "PoseEstimator.h"
 #include "MotionEstimator.h"
 #include "WandRadio.h"
+#include "GestureRecognizer.h"
+#include "Wand.h"
+#include "WandProtocol.h"
 
 // Class Instances 
 WandIMU wandIMU(Wire, 0x68);
 PoseEstimator poseEstimator;
 MotionEstimator motionEstimator;
+GestureRecognizer gestureRecognizer;
 WandRadio wandRadio;
 
 // Prototypes
 bool calibrationRequestedAtBoot();
-
-constexpr uint8_t BUTTON_PIN = 25;
-constexpr uint32_t CALIBRATION_HOLD_MS = 2500;
-constexpr uint8_t PANEL_MAC[6] = { 0x2C, 0xBC, 0xBB, 0x4B, 0x7C, 0x60 };
-constexpr uint32_t RADIO_INTERVAL_US = 20000;   // 50 Hz
 
 // For ESP-NOW
 uint32_t lastRadioUs = 0;
 uint32_t packetSequence = 0;
 
 uint32_t lastUpdateUs = 0;
+uint32_t lastImuReadMs = 0;
 uint32_t lastPrintMs = 0;
 bool poseUpdated = false;
 
@@ -82,15 +82,25 @@ void setup()
     Serial.begin(115200);
     delay(500);
 
-    pinMode(BUTTON_PIN, INPUT_PULLUP);
-
     Serial.println();
     Serial.println("PixelPanel Wand");
+
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
+
+    // Set up the wand tip RGB LED 
+    ledcSetup(RED_CHANNEL, 4000, 8);       // Set channel to 4 kHz, 8-bit resolution
+    ledcSetup(GREEN_CHANNEL, 4000, 8);     
+    ledcSetup(BLUE_CHANNEL, 4000, 8);       
+    ledcAttachPin(led_red, RED_CHANNEL); 
+    ledcAttachPin(led_green, GREEN_CHANNEL); 
+    ledcAttachPin(led_blue, BLUE_CHANNEL); 
+    ledcWrite(RED_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
+    ledcWrite(GREEN_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
+    ledcWrite(BLUE_CHANNEL, 220);    // Common anode so dutyCycle 0 is full bright, 255 is off
 
     // Set up ESP-NOW
     if (!wandRadio.begin(PANEL_MAC)) {
         Serial.println("Fatal ESP-NOW initialization error.");
-
         while (true) {
             delay(1000);
         }
@@ -111,12 +121,23 @@ void setup()
 
     // Always run the gyro calibration on boot-up
     wandIMU.gyroCalStart = millis();
+
 }
 
 
-void loop()
-{
+
+void loop() {
     IMUData imu;
+
+    if(digitalRead(BUTTON_PIN) == 0) {
+        ledcWrite(RED_CHANNEL, 235);    // Common anode so dutyCycle 0 is full bright, 255 is off
+        ledcWrite(GREEN_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
+        ledcWrite(BLUE_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
+    } else {
+        ledcWrite(RED_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
+        ledcWrite(GREEN_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
+        ledcWrite(BLUE_CHANNEL, 220);    // Common anode so dutyCycle 0 is full bright, 255 is off
+    }
 
     // First calibrate the gyro before doing the regular loop operations
     if (!wandIMU.gyroCalDone) {
@@ -125,110 +146,137 @@ void loop()
         return;
     }
 
-    if (wandIMU.read(imu)) {
-        uint32_t nowUs = micros();
-        if (lastUpdateUs != 0) {
-            float dt = (nowUs - lastUpdateUs) * 1.0e-6f;
-            poseEstimator.update(imu, dt);
-            const WandPose &pose = poseEstimator.getPose();
-            motionEstimator.update(imu,pose,dt);
-            poseUpdated = true;
-        }
-        lastUpdateUs = nowUs;
+    if (millis() - lastImuReadMs >= IMU_READ_INTERVAL_MS) {
+        if (wandIMU.read(imu)) {
+            uint32_t nowUs = micros();
+            if (lastUpdateUs != 0) {
+                float dt = (nowUs - lastUpdateUs) * 1.0e-6f;
 
+                poseEstimator.update(imu, dt);
+                poseUpdated = true;
 
-        // Send ESP-NOW packet at its own time interval
-        if (nowUs - lastRadioUs >= RADIO_INTERVAL_US) {
-        
-            lastRadioUs += RADIO_INTERVAL_US;
-        
-            const WandPose &pose = poseEstimator.getPose();
-            const WandMotion &motion = motionEstimator.getMotion();
-        
-            WandPacket wandPacket{};
-        
-            wandPacket.magic       = WAND_PROTOCOL_MAGIC;
-            wandPacket.version     = WAND_PROTOCOL_VERSION;
-        
-            wandPacket.sequence    = packetSequence++;
-            wandPacket.timestampMs = millis();
-        
-            wandPacket.mode        = WandMode::Scene;
-            wandPacket.gesture     = WandGesture::None;
-        
-            wandPacket.roll  = pose.roll;
-            wandPacket.pitch = pose.pitch;
-            wandPacket.yaw   = pose.yaw;
-        
-            wandPacket.gx = imu.gx;
-            wandPacket.gy = imu.gy;
-            wandPacket.gz = imu.gz;
-        
-            wandPacket.vx = motion.vx;
-            wandPacket.vy = motion.vy;
-            wandPacket.vz = motion.vz;
-        
-            if (!wandRadio.send(wandPacket)) {
-                //dlf Serial.println("ESP-NOW send failed.");
+                const WandPose &pose = poseEstimator.getPose();
+                motionEstimator.update(imu,pose,dt);
+
+                const WandMotion &motion = motionEstimator.getMotion();
+                gestureRecognizer.update(imu,pose,motion,dt);
+            }
+            lastUpdateUs = nowUs;
+    
+    
+            // Send ESP-NOW packet at its own time interval
+            if (nowUs - lastRadioUs >= RADIO_INTERVAL_US) {
+            
+                lastRadioUs += RADIO_INTERVAL_US;
+            
+                const WandPose &pose = poseEstimator.getPose();
+                const WandMotion &motion = motionEstimator.getMotion();
+            
+                WandPacket wandPacket{};
+            
+                wandPacket.magic       = WAND_PROTOCOL_MAGIC;
+                wandPacket.version     = WAND_PROTOCOL_VERSION;
+            
+                wandPacket.sequence    = packetSequence++;
+                wandPacket.timestampMs = millis();
+            
+                wandPacket.mode        = WandMode::Scene;
+
+                if(gestureRecognizer.eventAvailable()) {
+                    const GestureEvent &event = gestureRecognizer.getEvent();
+                    wandPacket.gesture = event.gesture;
+                    wandPacket.sequence = event.sequence;
+                }
+            
+                wandPacket.roll  = pose.roll;
+                wandPacket.pitch = pose.pitch;
+                wandPacket.yaw   = pose.yaw;
+            
+                wandPacket.gx = imu.gx;
+                wandPacket.gy = imu.gy;
+                wandPacket.gz = imu.gz;
+            
+                wandPacket.vx = motion.vx;
+                wandPacket.vy = motion.vy;
+                wandPacket.vz = motion.vz;
+            
+                if (!wandRadio.send(wandPacket)) {
+                    //dlf Serial.println("ESP-NOW send failed.");
+                }
+            }
+    
+            
+            // Debug printing - once a second so we don't fill the serial monitor too quickly
+            if (poseUpdated && millis() - lastPrintMs >= 1000) {
+                lastPrintMs = millis();
+    
+                const WandPose &pose = poseEstimator.getPose();
+                const WandMotion &motion = motionEstimator.getMotion();
+
+                if(gestureRecognizer.eventAvailable()) {
+                    const GestureEvent &event = gestureRecognizer.getEvent();
+                    if(event.gesture == WandGesture::ThrustIn){
+                        Serial.println("Gesture: ThrustIn");
+                    } else if(event.gesture == WandGesture::ThrustOut){
+                        Serial.println("Gesture: ThrustOut");
+                    }
+                    Serial.print("Sequence: "); Serial.println(event.sequence);
+                    Serial.print("timestampMs: "); Serial.println(event.timestampMs);
+                    gestureRecognizer.clearEvent();
+                }
+    
+                
+                Serial.print("Roll: ");
+                Serial.print(pose.roll * 180.0f / PI, 3);
+    
+                Serial.print("  Pitch: ");
+                Serial.print(pose.pitch * 180.0f / PI, 3);
+    
+                Serial.print("  Yaw: ");
+                Serial.println(pose.yaw * 180.0f / PI, 3);
+    
+                Serial.print("MotionY: ");
+                Serial.print(motion.ay, 3);
+    
+                Serial.print("  MotionX: ");
+                Serial.print(motion.ax, 3);
+    
+                Serial.print("  MotionZ: ");
+                Serial.println(motion.az, 3);
+    
+               // Serial.print("accelMag: ");
+               // Serial.print(accelMag,3);
+               // Serial.print("  accelTrust: ");
+               // Serial.println(accelTrust,3);
+    
+                Serial.print("VelocityY: ");
+                Serial.print(motion.vy, 3);
+    
+                Serial.print("  VelocityX: ");
+                Serial.print(motion.vx, 3);
+    
+                Serial.print("  VelocityZ: ");
+                Serial.println(motion.vz, 3);
+                
+                Serial.print("accelPitch: ");
+                Serial.println(accelPitch);
+                Serial.print("predictedPitch: ");
+                Serial.println(predictedPitch);
+                Serial.print("rollDiffTrust: ");
+                Serial.println(rollDiffTrust);
+                Serial.print("pitchDiffTrust: ");
+                Serial.println(pitchDiffTrust);
+                Serial.print("accelRollTrust: ");
+                Serial.println(accelRollTrust);
+                Serial.print("accelPitchTrust: ");
+                Serial.println(accelPitchTrust);
+                
+                Serial.println();
+                
             }
         }
-
-        
-        if (poseUpdated && millis() - lastPrintMs >= 1000) {
-            lastPrintMs = millis();
-
-            const WandPose &pose = poseEstimator.getPose();
-            const WandMotion &motion = motionEstimator.getMotion();
-
-            Serial.print("Roll: ");
-            Serial.print(pose.roll * 180.0f / PI, 3);
-
-            Serial.print("  Pitch: ");
-            Serial.print(pose.pitch * 180.0f / PI, 3);
-
-            Serial.print("  Yaw: ");
-            Serial.println(pose.yaw * 180.0f / PI, 3);
-
-            Serial.print("MotionY: ");
-            Serial.print(motion.ay, 3);
-
-            Serial.print("  MotionX: ");
-            Serial.print(motion.ax, 3);
-
-            Serial.print("  MotionZ: ");
-            Serial.println(motion.az, 3);
-
-           // Serial.print("accelMag: ");
-           // Serial.print(accelMag,3);
-           // Serial.print("  accelTrust: ");
-           // Serial.println(accelTrust,3);
-
-            Serial.print("VelocityY: ");
-            Serial.print(motion.vy, 3);
-
-            Serial.print("  VelocityX: ");
-            Serial.print(motion.vx, 3);
-
-            Serial.print("  VelocityZ: ");
-            Serial.println(motion.vz, 3);
-            
-            Serial.print("accelPitch: ");
-            Serial.println(accelPitch);
-            Serial.print("predictedPitch: ");
-            Serial.println(predictedPitch);
-            Serial.print("rollDiffTrust: ");
-            Serial.println(rollDiffTrust);
-            Serial.print("pitchDiffTrust: ");
-            Serial.println(pitchDiffTrust);
-            Serial.print("accelRollTrust: ");
-            Serial.println(accelRollTrust);
-            Serial.print("accelPitchTrust: ");
-            Serial.println(accelPitchTrust);
-            
-            Serial.println();
-        }
+        lastImuReadMs=millis();
     }
-    delay(10);
 }
 
 bool calibrationRequestedAtBoot()

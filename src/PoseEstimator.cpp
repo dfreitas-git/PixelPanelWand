@@ -17,15 +17,9 @@ float PoseEstimator::attitudeTrust(float diff)
 
 void PoseEstimator::update(const IMUData &imu, float dt)
 {
-    float accelRoll = atan2f(
-        -imu.ay,
-        -imu.az
-    );
+    float accelRoll = atan2f( -imu.ay, -imu.az);
 
-    accelPitch = atan2f(
-        imu.ax,
-        sqrtf(imu.ay * imu.ay + imu.az * imu.az)
-    );
+    accelPitch = atan2f( imu.ax, sqrtf(imu.ay * imu.ay + imu.az * imu.az));
 
     // We compute this to use later in deciding whether or not to trust the accel.  If we have a large
     // non gravity component, then we can't trust the result as much since motion acceleration is present.
@@ -61,8 +55,11 @@ void PoseEstimator::update(const IMUData &imu, float dt)
     rollDiffTrust = attitudeTrust(fabsf(predictedRoll - accelRoll));
     pitchDiffTrust = attitudeTrust(fabsf(predictedPitch - accelPitch));
 
-    accelRollTrust  = fmin(magnitudeTrust, rollDiffTrust);
-    accelPitchTrust = fmin(magnitudeTrust, pitchDiffTrust);
+    accelRollTrust  = magnitudeTrust;
+    accelPitchTrust = magnitudeTrust;
+
+    //dlf accelRollTrust  = fmin(magnitudeTrust, rollDiffTrust);
+    //dlf accelPitchTrust = fmin(magnitudeTrust, pitchDiffTrust);
 
     // Blending the result of the gyro and accelerometer depending on which we trust the most
     // for the current accelerometer/gyro results.

@@ -247,25 +247,6 @@ void WandIMU::runAccelCalibration(uint8_t buttonPin)
 
     Serial.println();
 
-    /*
-    Serial.println("GYROSCOPE CALIBRATION");
-    Serial.println("Place wand motionless on a stable surface.");
-    Serial.println("Press button when ready.");
-
-    waitForButtonPress(buttonPin);
-
-    Serial.println("Hold still...");
-    delay(500);
-    captureGyroAverage(gyX, gyY, gyZ);
-
-    Serial.print("gyX = ");
-    Serial.print(gyX, 6);
-    Serial.print("  gyY = ");
-    Serial.print(gyY, 6);
-    Serial.print("  gyZ = ");
-    Serial.println(gyZ, 6);
-    */
-
     Serial.println();
     Serial.println(F("Computing calibration..."));
 
@@ -282,18 +263,6 @@ void WandIMU::runAccelCalibration(uint8_t buttonPin)
         return;
     }
 
-    /*
-    if (!computeGyroCalibration(gyX, gyY, gyZ)) {
-
-        accelCal = oldAccelCal;
-        gyroCal = oldGyroCal;
-
-        Serial.println("GYRO CALIBRATION FAILED.");
-        Serial.println("Old calibration restored.");
-        return;
-    }
-
-    */
     printCalibration();
 
     if (saveCalibration()) {

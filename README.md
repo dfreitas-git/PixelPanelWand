@@ -45,3 +45,6 @@ Wand IMU code for the PixelPanel controller
     bias and scale factors are stored in non-volatile RAM using ESP Preferences.
 
     I am collaborating with chatGPT in designing and coding this project.
+
+### Schematics
+![Alt text](./WandSchematic.png "Wand Schematic")

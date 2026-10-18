@@ -1,7 +1,9 @@
 
 #include "GestureRecognizer.h"
+#include "Wand.h"
 
 void GestureRecognizer::update( const IMUData& imu, const WandPose& pose, const WandMotion& motion, float dt) {
+
     detectThrust(motion);
 
     // Later:
@@ -81,7 +83,7 @@ void GestureRecognizer::detectThrust(const WandMotion& motion)
 
         case ThrustState::Cooldown:
 
-            // We waif for some time plus acceleration must drop low enough before we allow rearming
+            // We wait for some time plus acceleration must drop low enough before we allow rearming
             if ((now - thrustCooldownStartMs > COOLDOWN_MS) &&
                 (fabsf(motion.ax) < REARM_ACCEL)) {
 
@@ -103,4 +105,5 @@ void GestureRecognizer::emitGesture(WandGesture gesture){
     event.gesture = gesture;
     event.sequence = ++sequence;
     event.timestampMs = millis();
+
 }

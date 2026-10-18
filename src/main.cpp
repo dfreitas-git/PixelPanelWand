@@ -59,6 +59,7 @@
 #include "WandProtocol.h"
 
 // Class Instances 
+Wand wand;
 WandIMU wandIMU(Wire, 0x68);
 PoseEstimator poseEstimator;
 MotionEstimator motionEstimator;
@@ -94,9 +95,9 @@ void setup()
     ledcAttachPin(led_red, RED_CHANNEL); 
     ledcAttachPin(led_green, GREEN_CHANNEL); 
     ledcAttachPin(led_blue, BLUE_CHANNEL); 
-    ledcWrite(RED_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
-    ledcWrite(GREEN_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
-    ledcWrite(BLUE_CHANNEL, 220);    // Common anode so dutyCycle 0 is full bright, 255 is off
+
+    // Set LED red until calibration is done
+    wand.setLED(128,0,0);
 
     // Set up ESP-NOW
     if (!wandRadio.begin(PANEL_MAC)) {
@@ -122,6 +123,7 @@ void setup()
     // Always run the gyro calibration on boot-up
     wandIMU.gyroCalStart = millis();
 
+    wand.setLED(0,0,35);
 }
 
 
@@ -129,14 +131,16 @@ void setup()
 void loop() {
     IMUData imu;
 
-    if(digitalRead(BUTTON_PIN) == 0) {
-        ledcWrite(RED_CHANNEL, 235);    // Common anode so dutyCycle 0 is full bright, 255 is off
-        ledcWrite(GREEN_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
-        ledcWrite(BLUE_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
+    // If we are not already flashing the LED, check the control button.
+    if(!wand.getFlashingState() && digitalRead(BUTTON_PIN) == 0) {
+        // Temporary code to flash the LED if the button is pushed (just for testing- dlf)
+        wand.setFlashingLED(3,250,200,0,128);  // Flash Purple
+    }
+    if(wand.getFlashingState()) {
+        wand.updateLED();
     } else {
-        ledcWrite(RED_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
-        ledcWrite(GREEN_CHANNEL, 255);    // Common anode so dutyCycle 0 is full bright, 255 is off
-        ledcWrite(BLUE_CHANNEL, 220);    // Common anode so dutyCycle 0 is full bright, 255 is off
+        // Idle with dim blue 
+        wand.setLED(0,0,35);
     }
 
     // First calibrate the gyro before doing the regular loop operations
@@ -186,6 +190,13 @@ void loop() {
                     const GestureEvent &event = gestureRecognizer.getEvent();
                     wandPacket.gesture = event.gesture;
                     wandPacket.sequence = event.sequence;
+
+                    if(event.gesture == WandGesture::ThrustIn) {
+                        wand.setFlashingLED(1,250,0,128,0);
+                    }
+                    if(event.gesture == WandGesture::ThrustOut) {
+                        wand.setFlashingLED(2,250,0,128,0);
+                    }
                 }
             
                 wandPacket.roll  = pose.roll;

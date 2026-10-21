@@ -27,15 +27,6 @@ struct WandState {
 class Wand {
 public:
 
-    bool flashing;
-    bool ledOn;
-    uint8_t ledFlashCount;
-    uint8_t flashR;
-    uint8_t flashG;
-    uint8_t flashB;
-    uint16_t flashDurationMs;
-    uint32_t nextFlash;
-
     void updateContinuousState(const IMUData& imu, const WandPose& pose, const WandMotion& motion, float dt);
     void updateLED();
     const bool getFlashingState() const {
@@ -52,5 +43,13 @@ private:
     WandState state{};
     WandMode mode{};
     GestureRecognizer gestureRecognizer;
+    bool flashing = false;
+    bool ledOn = false;
+    uint8_t ledFlashCount = 0;
+    uint8_t flashR = 0;
+    uint8_t flashG = 0;
+    uint8_t flashB = 0;
+    uint16_t flashDurationMs = 250;
+    uint32_t nextFlash;
 
 };

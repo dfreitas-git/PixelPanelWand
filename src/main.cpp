@@ -50,6 +50,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include "Globals.h"
+#include <WiFi.h>
 #include "WandIMU.h"
 #include "PoseEstimator.h"
 #include "MotionEstimator.h"
@@ -78,13 +79,22 @@ uint32_t lastImuReadMs = 0;
 uint32_t lastPrintMs = 0;
 bool poseUpdated = false;
 
+// Used for synchronizaton between Wand and Panel
+uint32_t sessionId;
+
+#define DEBUG_PRINT 0   // 0 - no debug print, 1 - one level of print, 2 - more detail
+
 void setup()
 {
     Serial.begin(115200);
-    delay(500);
+
+    // Wait for USB serial connection (min 2 seconds, max 5) so serial prints show up...
+    while ((!Serial || millis() < 2000) && millis() < 5000) {
+        delay(10);
+    }
 
     Serial.println();
-    Serial.println("PixelPanel Wand");
+    Serial.println(F("PixelPanel Wand"));
 
     pinMode(BUTTON_PIN, INPUT_PULLUP);
 
@@ -101,7 +111,7 @@ void setup()
 
     // Set up ESP-NOW
     if (!wandRadio.begin(PANEL_MAC)) {
-        Serial.println("Fatal ESP-NOW initialization error.");
+        Serial.println(F("Fatal ESP-NOW initialization error."));
         while (true) {
             delay(1000);
         }
@@ -110,7 +120,7 @@ void setup()
     bool doAccelCalibration = calibrationRequestedAtBoot();
 
     if (!wandIMU.begin()) {
-        Serial.println("Fatal IMU error.");
+        Serial.println(F("Fatal IMU error."));
         while (true) {
             delay(1000);
         }
@@ -123,7 +133,12 @@ void setup()
     // Always run the gyro calibration on boot-up
     wandIMU.gyroCalStart = millis();
 
+    // Everything initialized, set to LED to dim-blue
     wand.setLED(0,0,35);
+
+    // Create a sessionID that will be monitored by the PixePanel to be sure both
+    // are running from the same start (i.e. that one didn't get re-booted)
+    sessionId = esp_random();
 }
 
 
@@ -151,6 +166,7 @@ void loop() {
     }
 
     if (millis() - lastImuReadMs >= IMU_READ_INTERVAL_MS) {
+        WandPacket wandPacket{};
         if (wandIMU.read(imu)) {
             uint32_t nowUs = micros();
             if (lastUpdateUs != 0) {
@@ -164,6 +180,33 @@ void loop() {
 
                 const WandMotion &motion = motionEstimator.getMotion();
                 gestureRecognizer.update(imu,pose,motion,dt);
+
+                static uint32_t lastLEDSequence = 0;
+                const GestureEvent& event = gestureRecognizer.getEvent();
+                
+                // If the sequence number has changed it means we got a new gesture event
+                if (event.eventSequence != 0 &&
+                    event.eventSequence != lastLEDSequence) {
+                
+                    lastLEDSequence = event.eventSequence;
+                
+                    switch (event.gesture) {
+                        case WandGesture::ThrustIn:
+                            wand.setFlashingLED(1,250,0,128,0);  // Flash green once
+                            break;
+                
+                        case WandGesture::ThrustOut:
+                            wand.setFlashingLED(2,250,0,128,0);  // Flash green twice
+                            break;
+                
+                        default:
+                            break;
+                    }
+                }
+
+                wandPacket.gesture = event.gesture;
+                wandPacket.eventSequence = event.eventSequence;
+                wandPacket.eventTimestampMs = event.eventTimestampMs;
             }
             lastUpdateUs = nowUs;
     
@@ -176,29 +219,18 @@ void loop() {
                 const WandPose &pose = poseEstimator.getPose();
                 const WandMotion &motion = motionEstimator.getMotion();
             
-                WandPacket wandPacket{};
-            
                 wandPacket.magic       = WAND_PROTOCOL_MAGIC;
                 wandPacket.version     = WAND_PROTOCOL_VERSION;
-            
-                wandPacket.sequence    = packetSequence++;
-                wandPacket.timestampMs = millis();
-            
+                wandPacket.sessionId   =  sessionId;
+                wandPacket.packetSequence    = packetSequence++;
+                wandPacket.packetTimestampMs = millis();
                 wandPacket.mode        = WandMode::Scene;
-
-                if(gestureRecognizer.eventAvailable()) {
-                    const GestureEvent &event = gestureRecognizer.getEvent();
-                    wandPacket.gesture = event.gesture;
-                    wandPacket.sequence = event.sequence;
-
-                    if(event.gesture == WandGesture::ThrustIn) {
-                        wand.setFlashingLED(1,250,0,128,0);
-                    }
-                    if(event.gesture == WandGesture::ThrustOut) {
-                        wand.setFlashingLED(2,250,0,128,0);
-                    }
-                }
             
+                if (!wandRadio.send(wandPacket)) {
+                    //dlf Serial.println(F("ESP-NOW send failed."));
+                }
+
+                // Get the pose parameters
                 wandPacket.roll  = pose.roll;
                 wandPacket.pitch = pose.pitch;
                 wandPacket.yaw   = pose.yaw;
@@ -211,75 +243,54 @@ void loop() {
                 wandPacket.vy = motion.vy;
                 wandPacket.vz = motion.vz;
             
-                if (!wandRadio.send(wandPacket)) {
-                    //dlf Serial.println("ESP-NOW send failed.");
-                }
             }
     
             
             // Debug printing - once a second so we don't fill the serial monitor too quickly
-            if (poseUpdated && millis() - lastPrintMs >= 1000) {
+            if (DEBUG_PRINT == 2 && poseUpdated && millis() - lastPrintMs >= 1000) {
                 lastPrintMs = millis();
     
                 const WandPose &pose = poseEstimator.getPose();
                 const WandMotion &motion = motionEstimator.getMotion();
 
-                if(gestureRecognizer.eventAvailable()) {
-                    const GestureEvent &event = gestureRecognizer.getEvent();
-                    if(event.gesture == WandGesture::ThrustIn){
-                        Serial.println("Gesture: ThrustIn");
-                    } else if(event.gesture == WandGesture::ThrustOut){
-                        Serial.println("Gesture: ThrustOut");
-                    }
-                    Serial.print("Sequence: "); Serial.println(event.sequence);
-                    Serial.print("timestampMs: "); Serial.println(event.timestampMs);
-                    gestureRecognizer.clearEvent();
-                }
-    
-                
-                Serial.print("Roll: ");
+                Serial.print(F("Roll: "));
                 Serial.print(pose.roll * 180.0f / PI, 3);
     
-                Serial.print("  Pitch: ");
+                Serial.print(F("  Pitch: "));
                 Serial.print(pose.pitch * 180.0f / PI, 3);
     
-                Serial.print("  Yaw: ");
+                Serial.print(F("  Yaw: "));
                 Serial.println(pose.yaw * 180.0f / PI, 3);
     
-                Serial.print("MotionY: ");
+                Serial.print(F("MotionY: "));
                 Serial.print(motion.ay, 3);
     
-                Serial.print("  MotionX: ");
+                Serial.print(F("  MotionX: "));
                 Serial.print(motion.ax, 3);
     
-                Serial.print("  MotionZ: ");
+                Serial.print(F("  MotionZ: "));
                 Serial.println(motion.az, 3);
     
-               // Serial.print("accelMag: ");
-               // Serial.print(accelMag,3);
-               // Serial.print("  accelTrust: ");
-               // Serial.println(accelTrust,3);
-    
-                Serial.print("VelocityY: ");
+                Serial.print(F("VelocityY: "));
                 Serial.print(motion.vy, 3);
     
-                Serial.print("  VelocityX: ");
+                Serial.print(F("  VelocityX: "));
                 Serial.print(motion.vx, 3);
     
-                Serial.print("  VelocityZ: ");
+                Serial.print(F("  VelocityZ: "));
                 Serial.println(motion.vz, 3);
                 
-                Serial.print("accelPitch: ");
+                Serial.print(F("accelPitch: "));
                 Serial.println(accelPitch);
-                Serial.print("predictedPitch: ");
+                Serial.print(F("predictedPitch: "));
                 Serial.println(predictedPitch);
-                Serial.print("rollDiffTrust: ");
+                Serial.print(F("rollDiffTrust: "));
                 Serial.println(rollDiffTrust);
-                Serial.print("pitchDiffTrust: ");
+                Serial.print(F("pitchDiffTrust: "));
                 Serial.println(pitchDiffTrust);
-                Serial.print("accelRollTrust: ");
+                Serial.print(F("accelRollTrust: "));
                 Serial.println(accelRollTrust);
-                Serial.print("accelPitchTrust: ");
+                Serial.print(F("accelPitchTrust: "));
                 Serial.println(accelPitchTrust);
                 
                 Serial.println();

@@ -11,10 +11,6 @@ void GestureRecognizer::update( const IMUData& imu, const WandPose& pose, const 
     // detectCircle(...);
 }
 
-void GestureRecognizer::clearEvent() {
-    event.gesture = WandGesture::None;
-}
-
 bool GestureRecognizer::eventAvailable() const
 {
     return event.gesture != WandGesture::None;
@@ -54,7 +50,7 @@ void GestureRecognizer::detectThrust(const WandMotion& motion)
             if (directedVelocity > thrustPeakVelocity) {
                 thrustPeakVelocity = directedVelocity;
             }
-            Serial.print("ThrustState: Tracking "); Serial.print(" directedVelocity: "); Serial.println(directedVelocity);
+            Serial.print(F("ThrustState: Tracking ")); Serial.print(F(" directedVelocity: ")); Serial.println(directedVelocity);
 
             // Acceleration has reversed: braking phase.
             if (directedAccel < 0.0f) {
@@ -100,10 +96,10 @@ void GestureRecognizer::detectCircle(){
 }
 
 void GestureRecognizer::emitGesture(WandGesture gesture){
-    static uint32_t sequence = 0;
+    static uint32_t eventSequence = 0;
 
     event.gesture = gesture;
-    event.sequence = ++sequence;
-    event.timestampMs = millis();
+    event.eventSequence = ++eventSequence;
+    event.eventTimestampMs = millis();
 
 }

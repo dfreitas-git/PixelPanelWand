@@ -9,12 +9,6 @@
 #include "MotionEstimator.h"
 
 
-struct GestureEvent {
-    WandGesture gesture = WandGesture::None;
-    uint32_t sequence = 0;
-    uint32_t timestampMs = 0;
-};
-
 enum class ThrustState : uint8_t {
     Idle,
     Tracking,
@@ -32,7 +26,6 @@ public:
     const GestureEvent &getEvent() const {
         return(event);
     }
-    void clearEvent();
 
 private:
     GestureEvent event;

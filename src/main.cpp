@@ -225,10 +225,6 @@ void loop() {
                 wandPacket.packetSequence    = packetSequence++;
                 wandPacket.packetTimestampMs = millis();
                 wandPacket.mode        = WandMode::Scene;
-            
-                if (!wandRadio.send(wandPacket)) {
-                    //dlf Serial.println(F("ESP-NOW send failed."));
-                }
 
                 // Get the pose parameters
                 wandPacket.roll  = pose.roll;
@@ -242,6 +238,10 @@ void loop() {
                 wandPacket.vx = motion.vx;
                 wandPacket.vy = motion.vy;
                 wandPacket.vz = motion.vz;
+
+                if (!wandRadio.send(wandPacket)) {
+                    //dlf Serial.println(F("ESP-NOW send failed."));
+                }
             
             }
     

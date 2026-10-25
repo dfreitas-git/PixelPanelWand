@@ -57,11 +57,8 @@ void GestureRecognizer::detectThrust(const WandMotion& motion)
     switch (thrustState) {
 
         case ThrustState::Idle:
-
             if (fabsf(motion.ax) > THRUST_START_ACCEL) {
-
                 thrustDirection = (motion.ax > 0.0f) ? 1 : -1;
-
                 thrustState = ThrustState::Tracking;
                 thrustStartMs = now;
                 thrustPeakVelocity = 0.0f;
@@ -126,7 +123,6 @@ void GestureRecognizer::detectSwipe(const WandMotion& motion, float dt)
     switch (swipeState) {
 
         case SwipeState::Idle:
-
             if (hypotf(motion.aRight, motion.aUp) > SWIPE_START_ACCEL) {
                 swipeState = SwipeState::Candidate;
                 swipeStartMs = now;
@@ -139,7 +135,6 @@ void GestureRecognizer::detectSwipe(const WandMotion& motion, float dt)
 
 
         case SwipeState::Candidate: 
-
             if (now - swipeStartMs > SWIPE_ACCUMULATE_MS) {
                 swipeState = SwipeState::Direction;
             } else {
@@ -150,16 +145,13 @@ void GestureRecognizer::detectSwipe(const WandMotion& motion, float dt)
             break;
 
         case SwipeState::Direction: 
-
             swipeDirection = atan2(sumUp, sumRight);
-            Serial.print("Swipe direction in degrees: ");
-            Serial.println(swipeDirection * 180 / PI);
-
+            emitGesture(WandGesture::Swipe,swipeDirection);
             swipeState = SwipeState::Cooldown;
             swipeCooldownStartMs = now;
             break;
 
-        case SwipeState::Cooldown:
+        case SwipeState::Cooldown: {
             // We wait for some time plus acceleration must drop low enough before we allow rearming
             float lateralAccel = hypotf(motion.aRight, motion.aUp);
 
@@ -167,17 +159,18 @@ void GestureRecognizer::detectSwipe(const WandMotion& motion, float dt)
                 swipeState = SwipeState::Idle;
             }
             break;
+        }
     }
 }
 
 void GestureRecognizer::detectCircle(){
 }
 
-void GestureRecognizer::emitGesture(WandGesture gesture){
+void GestureRecognizer::emitGesture( WandGesture gesture, float direction)
+{
     static uint32_t eventSequence = 0;
-
     event.gesture = gesture;
     event.eventSequence = ++eventSequence;
     event.eventTimestampMs = millis();
-
+    event.swipeDirection = direction;
 }

@@ -77,5 +77,5 @@ private:
     void detectSwipe(const WandMotion& motion, float dt);
     void detectCircle();
 
-    void emitGesture(WandGesture gesture);
+    void emitGesture( WandGesture gesture, float direction = 0.0f);
 };

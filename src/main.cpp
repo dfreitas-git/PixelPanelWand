@@ -82,7 +82,6 @@ bool poseUpdated = false;
 // Used for synchronizaton between Wand and Panel
 uint32_t sessionId;
 
-#define DEBUG_PRINT 0   // 0 - no debug print, 1 - one level of print, 2 - more detail
 bool buttonPushed;      // if the button is pushed, print various sensor readings
 
 void setup()
@@ -208,6 +207,8 @@ void loop() {
                 wandPacket.gesture = event.gesture;
                 wandPacket.eventSequence = event.eventSequence;
                 wandPacket.eventTimestampMs = event.eventTimestampMs;
+                wandPacket.swipeDirection = event.swipeDirection;
+
             }
             lastUpdateUs = nowUs;
     

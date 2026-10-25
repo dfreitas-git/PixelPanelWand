@@ -5,7 +5,6 @@
 void Wand::updateContinuousState(const IMUData& imu, const WandPose& pose, const WandMotion& motion, float dt) {
 }
 
-
 void Wand::updateLED(){
     uint8_t R;
     uint8_t G;

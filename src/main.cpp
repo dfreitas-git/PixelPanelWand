@@ -61,6 +61,7 @@
 
 // Class Instances 
 Wand wand;
+WandMode currentMode = WandMode::Scene;
 WandIMU wandIMU(Wire, 0x68);
 PoseEstimator poseEstimator;
 MotionEstimator motionEstimator;
@@ -69,6 +70,7 @@ WandRadio wandRadio;
 
 // Prototypes
 bool calibrationRequestedAtBoot();
+static bool modeButtonPressed();
 
 // For ESP-NOW
 uint32_t lastRadioUs = 0;
@@ -81,8 +83,6 @@ bool poseUpdated = false;
 
 // Used for synchronizaton between Wand and Panel
 uint32_t sessionId;
-
-bool buttonPushed;      // if the button is pushed, print various sensor readings
 
 void setup()
 {
@@ -150,19 +150,30 @@ void loop() {
         return;
     }
 
-    // If we are not already flashing the LED, check the control button.
-    buttonPushed = ! digitalRead(BUTTON_PIN);
-
-    //if(!wand.getFlashingState() && digitalRead(BUTTON_PIN) == 0) {
-    if(!wand.getFlashingState() && buttonPushed) {
+    // Toggle the current mode (scene for displaying animations, panel for setting system parameters)
+    if (modeButtonPressed()) {
+        wand.toggleMode();
+        if(DEBUG_PRINT == 1) {
+            Serial.print("Toggle wand mode to: ");
+            if(wand.getMode() == WandMode::Panel) {
+                Serial.println("Panel");
+            } else {
+                Serial.println("Scene");
+            }
+        }
         // Temporary code to flash the LED if the button is pushed (just for testing- dlf)
-        wand.setFlashingLED(3,250,200,0,128);  // Flash Purple
+        //wand.setFlashingLED(3,250,200,0,128);  // Flash Purple
     }
+
     if(wand.getFlashingState()) {
         wand.updateLED();
     } else {
-        // Idle with dim blue 
-        wand.setLED(0,0,35);
+        // Idle with dim blue for Scene, Red if we are doing panel commands
+        if(wand.getMode() == WandMode::Scene) {
+            wand.setLED(0,0,35);
+        } else {
+            wand.setLED(35,0,0);
+        }
     }
 
     if (millis() - lastImuReadMs >= IMU_READ_INTERVAL_MS) {
@@ -226,7 +237,7 @@ void loop() {
                 wandPacket.sessionId   =  sessionId;
                 wandPacket.packetSequence    = packetSequence++;
                 wandPacket.packetTimestampMs = millis();
-                wandPacket.mode        = WandMode::Scene;
+                wandPacket.mode = currentMode;
 
                 // Get the pose parameters
                 wandPacket.roll  = pose.roll;
@@ -249,8 +260,8 @@ void loop() {
     
             
             // Debug printing - once a second so we don't fill the serial monitor too quickly
-            // or full 50hz if pushing the button
-            if (buttonPushed || (DEBUG_PRINT == 2 && poseUpdated && millis() - lastPrintMs >= 1000)) {
+            // or full 50hz if pushing the button (not debounced)
+            if ((digitalRead(BUTTON_PIN) == 0 && DEBUG_PRINT == 1) || (DEBUG_PRINT == 2 && poseUpdated && millis() - lastPrintMs >= 1000)) {
                 lastPrintMs = millis();
     
                 const WandPose &pose = poseEstimator.getPose();
@@ -339,6 +350,32 @@ bool calibrationRequestedAtBoot()
         }
 
         delay(10);
+    }
+
+    return false;
+}
+
+// Returns true once for each debounced button press
+static bool modeButtonPressed() {
+    static bool lastReading = HIGH;
+    static bool stableState = HIGH;
+    static uint32_t lastChangeMs = 0;
+
+    constexpr uint32_t DEBOUNCE_MS = 20;
+
+    bool reading = digitalRead(BUTTON_PIN);
+    uint32_t now = millis();
+
+    if (reading != lastReading)
+        lastChangeMs = now;
+
+    lastReading = reading;
+
+    if ((now - lastChangeMs >= DEBOUNCE_MS) &&
+        (reading != stableState)) {
+
+        stableState = reading;
+        return stableState == LOW;
     }
 
     return false;

@@ -11,6 +11,12 @@ struct WandMotion {
     float ax;
     float ay;
     float az;
+
+    // horizontal acceleratoin
+    float aRight;
+    float aUp;
+    float aLeft;
+    float aDown;
     
     // Velocity
     float vx;

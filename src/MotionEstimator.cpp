@@ -37,4 +37,10 @@ void MotionEstimator::update(const IMUData &imu, const WandPose &pose,float dt)
     motion.vy *= damping;
     motion.vz *= damping;
 
+    // Horizontal acceleration: positive = right
+    motion.aRight = motion.ay * cosf(pose.roll) - motion.az * sinf(pose.roll);
+
+    // Vertical acceleration: positive = up
+    motion.aUp = -motion.ay * sinf(pose.roll) - motion.az * cosf(pose.roll);
+
 }

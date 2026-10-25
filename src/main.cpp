@@ -83,6 +83,7 @@ bool poseUpdated = false;
 uint32_t sessionId;
 
 #define DEBUG_PRINT 0   // 0 - no debug print, 1 - one level of print, 2 - more detail
+bool buttonPushed;      // if the button is pushed, print various sensor readings
 
 void setup()
 {
@@ -133,9 +134,6 @@ void setup()
     // Always run the gyro calibration on boot-up
     wandIMU.gyroCalStart = millis();
 
-    // Everything initialized, set to LED to dim-blue
-    wand.setLED(0,0,35);
-
     // Create a sessionID that will be monitored by the PixePanel to be sure both
     // are running from the same start (i.e. that one didn't get re-booted)
     sessionId = esp_random();
@@ -146,8 +144,18 @@ void setup()
 void loop() {
     IMUData imu;
 
+    // First calibrate the gyro before doing the regular loop operations
+    if (!wandIMU.gyroCalDone) {
+        wandIMU.runGyroCalibration();
+        delay(10);
+        return;
+    }
+
     // If we are not already flashing the LED, check the control button.
-    if(!wand.getFlashingState() && digitalRead(BUTTON_PIN) == 0) {
+    buttonPushed = ! digitalRead(BUTTON_PIN);
+
+    //if(!wand.getFlashingState() && digitalRead(BUTTON_PIN) == 0) {
+    if(!wand.getFlashingState() && buttonPushed) {
         // Temporary code to flash the LED if the button is pushed (just for testing- dlf)
         wand.setFlashingLED(3,250,200,0,128);  // Flash Purple
     }
@@ -156,13 +164,6 @@ void loop() {
     } else {
         // Idle with dim blue 
         wand.setLED(0,0,35);
-    }
-
-    // First calibrate the gyro before doing the regular loop operations
-    if (!wandIMU.gyroCalDone) {
-        wandIMU.runGyroCalibration();
-        delay(10);
-        return;
     }
 
     if (millis() - lastImuReadMs >= IMU_READ_INTERVAL_MS) {
@@ -247,7 +248,8 @@ void loop() {
     
             
             // Debug printing - once a second so we don't fill the serial monitor too quickly
-            if (DEBUG_PRINT == 2 && poseUpdated && millis() - lastPrintMs >= 1000) {
+            // or full 50hz if pushing the button
+            if (buttonPushed || (DEBUG_PRINT == 2 && poseUpdated && millis() - lastPrintMs >= 1000)) {
                 lastPrintMs = millis();
     
                 const WandPose &pose = poseEstimator.getPose();
@@ -271,6 +273,12 @@ void loop() {
                 Serial.print(F("  MotionZ: "));
                 Serial.println(motion.az, 3);
     
+                Serial.print(F("aRight: "));
+                Serial.print(motion.aRight, 3);
+    
+                Serial.print(F(" aUp: "));
+                Serial.println(motion.aUp, 3);
+    
                 Serial.print(F("VelocityY: "));
                 Serial.print(motion.vy, 3);
     
@@ -279,6 +287,16 @@ void loop() {
     
                 Serial.print(F("  VelocityZ: "));
                 Serial.println(motion.vz, 3);
+                
+                Serial.print(F("GyroY: "));
+                Serial.print(imu.gy, 3);
+    
+                Serial.print(F(" GyroX: "));
+                Serial.print(imu.gx, 3);
+    
+                Serial.print(F(" GyroZ: "));
+                Serial.println(imu.gz, 3);
+    
                 
                 Serial.print(F("accelPitch: "));
                 Serial.println(accelPitch);

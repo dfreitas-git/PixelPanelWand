@@ -153,9 +153,11 @@ void loop() {
     // Toggle the current mode (scene for displaying animations, panel for setting system parameters)
     if (modeButtonPressed()) {
         wand.toggleMode();
+        currentMode = wand.getMode();
+
         if(DEBUG_PRINT == 1) {
             Serial.print("Toggle wand mode to: ");
-            if(wand.getMode() == WandMode::Panel) {
+            if(currentMode == WandMode::Panel) {
                 Serial.println("Panel");
             } else {
                 Serial.println("Scene");
@@ -253,7 +255,7 @@ void loop() {
                 wandPacket.vz = motion.vz;
 
                 if (!wandRadio.send(wandPacket)) {
-                    //dlf Serial.println(F("ESP-NOW send failed."));
+                    Serial.println(F("ESP-NOW send failed."));
                 }
             
             }
@@ -261,7 +263,7 @@ void loop() {
             
             // Debug printing - once a second so we don't fill the serial monitor too quickly
             // or full 50hz if pushing the button (not debounced)
-            if ((digitalRead(BUTTON_PIN) == 0 && DEBUG_PRINT == 1) || (DEBUG_PRINT == 2 && poseUpdated && millis() - lastPrintMs >= 1000)) {
+            if ((digitalRead(BUTTON_PIN) == 0 && DEBUG_PRINT == 2) || (DEBUG_PRINT == 3 && poseUpdated && millis() - lastPrintMs >= 1000)) {
                 lastPrintMs = millis();
     
                 const WandPose &pose = poseEstimator.getPose();

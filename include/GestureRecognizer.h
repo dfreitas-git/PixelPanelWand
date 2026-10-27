@@ -17,7 +17,6 @@ enum class ThrustState : uint8_t {
 enum class SwipeState : uint8_t {
     Idle,
     Candidate,
-    Direction,
     Cooldown
 };
 
@@ -54,9 +53,11 @@ private:
     const uint32_t THRUST_COOLDOWN_MS    = 300;
 
     const float SWIPE_START_ACCEL       = 1.5f;
-    const float SWIPE_MIN_PEAK_VELOCITY = 0.15f;
+    const float SWIPE_MIN_DELTA_V       = 0.4f;
     const uint32_t SWIPE_ACCUMULATE_MS  = 120;
     const uint32_t SWIPE_COOLDOWN_MS    = 300;
+
+    const float SWIPE_MAX_ROLL_RATE = 1.5f;  // radians/sec
 
     float thrustPeakVelocity = 0.0f;
     int8_t thrustDirection = 0;   // +1 forward, -1 backward

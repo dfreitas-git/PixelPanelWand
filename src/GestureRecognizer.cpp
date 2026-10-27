@@ -6,6 +6,11 @@ void GestureRecognizer::update( const IMUData& imu, const WandPose& pose, const 
 
     float axialAccel = fabsf(motion.ax);
     float lateralAccel = hypotf(motion.aRight, motion.aUp);
+
+    //bool excessiveRoll =
+    //    fabsf(imu.gx) > SWIPE_MAX_ROLL_RATE;
+    bool excessiveRoll = false;
+
     switch (activeGesture) {
 
         case ActiveGesture::None:
@@ -15,9 +20,10 @@ void GestureRecognizer::update( const IMUData& imu, const WandPose& pose, const 
                 activeGesture = ActiveGesture::Thrust;
                 detectThrust(motion);
             }
-            else if (lateralAccel > SWIPE_START_ACCEL) {
+            else if (lateralAccel > SWIPE_START_ACCEL &&
+                     !excessiveRoll) {
                 activeGesture = ActiveGesture::Swipe;
-                detectSwipe(motion,dt);
+                detectSwipe(motion, dt);
             }
             break;
 
@@ -31,13 +37,20 @@ void GestureRecognizer::update( const IMUData& imu, const WandPose& pose, const 
 
         case ActiveGesture::Swipe:
 
-            detectSwipe(motion,dt);
+            if (excessiveRoll && swipeState == SwipeState::Candidate) {
 
-            if (swipeState == SwipeState::Idle)
+                // Cancel the candidate and release ownership
+                swipeState = SwipeState::Idle;
                 activeGesture = ActiveGesture::None;
+            }
+            else {
+                detectSwipe(motion, dt);
+
+                if (swipeState == SwipeState::Idle)
+                    activeGesture = ActiveGesture::None;
+            }
             break;
     }
-
     // Later:
     // detectCircle(...);
 }
@@ -112,11 +125,6 @@ void GestureRecognizer::detectThrust(const WandMotion& motion)
 
 void GestureRecognizer::detectSwipe(const WandMotion& motion, float dt)
 {
-    constexpr float SWIPE_START_ACCEL       = 1.5f;
-    constexpr float SWIPE_MIN_PEAK_VELOCITY = 0.15f;
-    constexpr uint32_t SWIPE_ACCUMULATE_MS  = 120;
-    constexpr uint32_t SWIPE_COOLDOWN_MS    = 300;
-
     uint32_t now = millis();
 
     // See if we have a swipe movement
@@ -128,27 +136,36 @@ void GestureRecognizer::detectSwipe(const WandMotion& motion, float dt)
                 swipeStartMs = now;
                 swipeDtStartMs = now;
                 swipePeakVelocity = 0.0f;
-                sumRight = motion.aRight * dt * 1000.0f;  // dt is in uS so convert to mS
-                sumUp = motion.aUp * dt * 1000.0f;
+                sumRight = motion.aRight * dt; 
+                sumUp = motion.aUp * dt;
             }
             break;
 
+        case SwipeState::Candidate:
 
-        case SwipeState::Candidate: 
-            if (now - swipeStartMs > SWIPE_ACCUMULATE_MS) {
-                swipeState = SwipeState::Direction;
-            } else {
-                sumRight += motion.aRight * (now - swipeDtStartMs);
-                sumUp += motion.aUp * (now - swipeDtStartMs);
-                swipeDtStartMs = millis();
+            sumRight += motion.aRight * dt;
+            sumUp += motion.aUp * dt;
+
+            if (now - swipeStartMs >= SWIPE_ACCUMULATE_MS) {
+                float swipeDeltaV = hypotf(sumRight, sumUp);
+
+                if (swipeDeltaV >= SWIPE_MIN_DELTA_V) {
+                    swipeDirection = atan2f(sumUp, sumRight);
+                    emitGesture(WandGesture::Swipe, swipeDirection);
+                }
+
+                swipeState = SwipeState::Cooldown;
+                swipeCooldownStartMs = now;
+
+                if(DEBUG_PRINT == 2) {
+                    float swipeDeltaV = hypotf(sumRight, sumUp);
+                    Serial.printf(
+                        "Swipe candidate: dV=%.3f  direction=%.1f\n",
+                        swipeDeltaV,
+                        atan2f(sumUp, sumRight) * 180.0f / PI
+                    );
+                }
             }
-            break;
-
-        case SwipeState::Direction: 
-            swipeDirection = atan2(sumUp, sumRight);
-            emitGesture(WandGesture::Swipe,swipeDirection);
-            swipeState = SwipeState::Cooldown;
-            swipeCooldownStartMs = now;
             break;
 
         case SwipeState::Cooldown: {

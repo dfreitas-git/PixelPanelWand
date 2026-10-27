@@ -80,6 +80,7 @@ uint32_t lastUpdateUs = 0;
 uint32_t lastImuReadMs = 0;
 uint32_t lastPrintMs = 0;
 bool poseUpdated = false;
+uint32_t espNowFails = 0;
 
 // Used for synchronizaton between Wand and Panel
 uint32_t sessionId;
@@ -155,7 +156,7 @@ void loop() {
         wand.toggleMode();
         currentMode = wand.getMode();
 
-        if(DEBUG_PRINT == 1) {
+        if(DEBUG_PRINT >= 1) {
             Serial.print("Toggle wand mode to: ");
             if(currentMode == WandMode::Panel) {
                 Serial.println("Panel");
@@ -255,7 +256,10 @@ void loop() {
                 wandPacket.vz = motion.vz;
 
                 if (!wandRadio.send(wandPacket)) {
-                    Serial.println(F("ESP-NOW send failed."));
+                    espNowFails++;
+                    if(DEBUG_PRINT >= 1) {
+                        Serial.print(F("ESP-NOW send fail count: ")); Serial.println(espNowFails);
+                    }
                 }
             
             }

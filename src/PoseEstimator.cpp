@@ -2,6 +2,12 @@
 #include "WandIMU.h"
 #include "PoseEstimator.h"
 
+// Compute the smallest angle difference between two angles
+static float angleDifference(float target, float reference) {
+    float diff = target - reference;
+    return atan2f(sinf(diff), cosf(diff));
+}
+
 float PoseEstimator::attitudeTrust(float diff)
 {
     if (diff <= DIFF_FULL_TRUST)
@@ -52,7 +58,9 @@ void PoseEstimator::update(const IMUData &imu, float dt)
         magnitudeTrust = 1.0f - (error - 0.25f) / (1.5f - 0.25f);
     }
 
-    rollDiffTrust = attitudeTrust(fabsf(predictedRoll - accelRoll));
+    rollDiffTrust = attitudeTrust(fabsf(angleDifference(accelRoll, predictedRoll)));
+    //dlf-old rollDiffTrust = attitudeTrust(fabsf(predictedRoll - accelRoll));
+
     pitchDiffTrust = attitudeTrust(fabsf(predictedPitch - accelPitch));
 
     accelRollTrust  = magnitudeTrust;
@@ -69,7 +77,13 @@ void PoseEstimator::update(const IMUData &imu, float dt)
     float rollAlpha = 1.0f - (1.0f - baseAlpha) * accelRollTrust;
     float pitchAlpha = 1.0f - (1.0f - baseAlpha) * accelPitchTrust;
 
-    pose.roll = rollAlpha * predictedRoll + (1.0f - rollAlpha) * accelRoll;
+    float rollError = angleDifference(accelRoll, predictedRoll);
+    pose.roll = predictedRoll + (1.0f - rollAlpha) * rollError;
+
+    // Keep the stored roll within -PI to +PI
+    pose.roll = atan2f(sinf(pose.roll), cosf(pose.roll));
+    //dlf-old pose.roll = rollAlpha * predictedRoll + (1.0f - rollAlpha) * accelRoll;
+
     pose.pitch = pitchAlpha * predictedPitch + (1.0f - pitchAlpha) * accelPitch;
     pose.yaw += imu.gz * dt;
 

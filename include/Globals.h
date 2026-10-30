@@ -1,7 +1,7 @@
 
 #pragma once
 
-#define DEBUG_PRINT 1   // 0 - no debug print, 1 - one level of print, 2 - more detail, 3 even more detail
+#define DEBUG_PRINT 0   // 0 - no debug print, 1 - one level of print, 2 - more detail, 3 even more detail
 
 constexpr float G = 9.80665f;
 

@@ -260,6 +260,7 @@ void loop() {
                     if(DEBUG_PRINT >= 1) {
                         Serial.print(F("ESP-NOW send fail count: ")); Serial.println(espNowFails);
                     }
+                    wand.setFlashingLED(1,250,200,0,128);  // Flash Purple if we lose a packet
                 }
             
             }
